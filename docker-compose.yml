@@ -1,0 +1,39 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - elasticsearch
+      - qdrant
+      - redis
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  streamlit:
+    build: .
+    env_file: .env
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    command: streamlit run streamlit_app.py --server.address=0.0.0.0 --server.port=8501
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    ports:
+      - "6333:6333"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

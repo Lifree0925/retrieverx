@@ -1,0 +1,17 @@
+## Streamlit 主题配置
+## 放在项目根目录的 .streamlit/config.toml，streamlit run 时自动读取。
+## 想要"纯白 + 克制"的观感：白底、极浅的次级背景、细边框、单一蓝色强调色。
+
+[theme]
+base = "light"
+primaryColor = "#2F6FEB"                 # 强调色：按钮、滑块、选中态
+backgroundColor = "#FFFFFF"              # 纯白主背景
+secondaryBackgroundColor = "#F7F8FA"     # 侧边栏/输入框等次级背景，只比白深一点点
+textColor = "#1F2328"                    # 正文色（GitHub 风的近黑）
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"                  # 收起右上角工具栏，演示时更干净
+
+[browser]
+gatherUsageStats = false                 # 关闭匿名使用统计上报

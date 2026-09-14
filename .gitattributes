@@ -1,0 +1,36 @@
+# ============================================================
+#  统一行尾与文件类型
+#
+#  为什么需要它：Windows 上 git 默认会把换行在 CRLF / LF 之间来回转换，
+#  同一次改动在不同机器上 diff 会整文件变红，评审时噪音极大。
+#  这里显式规定：仓库内一律存 LF。
+# ============================================================
+
+# 默认：由 git 判定文本文件，仓库内统一用 LF
+* text=auto eol=lf
+
+# Windows 批处理必须保留 CRLF（丢了 \r 会让 .bat 出现诡异行为）
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# PowerShell 脚本也用 CRLF
+*.ps1 text eol=crlf
+
+# 明确声明为二进制，禁止任何行尾转换
+*.pdf  binary
+*.db   binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.safetensors binary
+*.pkl  binary
+*.bin  binary
+*.onnx binary
+
+# 让 git 统计里把这两个目录当文档，不参与语言判定
+*.md   text
+LICENSE text

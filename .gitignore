@@ -1,0 +1,23 @@
+# 依赖与虚拟环境
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# 本地配置与密钥：绝对不要提交（API Key 只在 .env 里）
+# .env.* 覆盖 .env.bak / .env.local 等一切派生物，避免旧配置（含旧模型与旧维度）被推上仓库
+.env
+.env.*
+!.env.example
+
+# 运行时产物
+*.log
+uploads/*
+!uploads/.gitkeep
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

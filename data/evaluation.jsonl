@@ -1,0 +1,2 @@
+{"query":"SKU A123 的销售额是多少","relevant_chunk_ids":["REPLACE_WITH_REAL_CHUNK_ID"],"query_type":"EXACT"}
+{"query":"为什么最近销售下降","relevant_chunk_ids":["REPLACE_WITH_REAL_CHUNK_ID"],"query_type":"SEMANTIC"}

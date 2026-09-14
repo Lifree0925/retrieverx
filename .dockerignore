@@ -1,0 +1,35 @@
+# ============================================================
+#  Docker 构建上下文排除表
+#
+#  为什么必须有这个文件：
+#   Dockerfile 里写了 `COPY . .`，而 .gitignore 对 docker build 完全无效——
+#   没有这份文件时，venv/（约 1GB）和 .env（含 API Key）会被一起拷进镜像层。
+#   镜像体积暴涨只是次要问题，**密钥被烧进镜像层**才是真问题。
+# ============================================================
+
+# ---------- 虚拟环境与缓存（镜像里由 pip install -r requirements.txt 重建） ----------
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---------- 本地配置与密钥：绝不能进镜像 ----------
+.env
+.env.*
+!.env.example
+
+# ---------- 版本控制与编辑器 ----------
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ---------- 运行时产物 ----------
+*.log
+uploads/*
+!uploads/.gitkeep
