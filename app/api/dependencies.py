@@ -23,6 +23,7 @@ from app.core.pipeline import RetrievalService
 from app.core.query_classifier import QueryClassifier
 from app.core.reranker import Reranker
 from app.core.retrieval_policy import RetrievalPolicy
+from app.core.trace import TraceStore
 from app.core.vector_search import VectorRetriever
 
 
@@ -47,6 +48,11 @@ def get_vector() -> VectorRetriever:
 @lru_cache
 def get_feedback_store() -> FeedbackStore:
     return FeedbackStore()
+
+
+@lru_cache
+def get_trace_store() -> TraceStore:
+    return TraceStore()
 
 
 @lru_cache
@@ -91,6 +97,7 @@ def get_retrieval_service() -> RetrievalService:
         policy=get_policy(),
         feedback_store=get_feedback_store(),
         reranker_provider=get_reranker,
+        trace_store=get_trace_store(),
     )
 
 
@@ -103,6 +110,10 @@ def get_retrieval_service_dep() -> RetrievalService:
 
 def get_feedback_store_dep() -> FeedbackStore:
     return get_feedback_store()
+
+
+def get_trace_store_dep() -> TraceStore:
+    return get_trace_store()
 
 
 def get_bm25_dep() -> BM25Retriever:

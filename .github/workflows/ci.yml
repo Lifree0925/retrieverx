@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # 先装 CPU 版 torch。
+      # 原因：requirements 里的 sentence-transformers 会把 torch 作为传递依赖拉进来，
+      # 默认索引拿到的是 CUDA 版（镜像数 GB，CI 上要下十几分钟）。
+      # 先把 CPU 版装上，后面 pip 就会认为依赖已满足、不再拉 CUDA 版。
+      - name: 安装 CPU 版 torch
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      # 说明：这里的测试是**不依赖外部服务**的（ES / Qdrant / Redis 都用假对象替换）。
+      # 因此在 CI 里不需要起中间件。端到端检索需要真实服务，
+      # 属于本地/部署阶段的事，不放进 CI（否则每次都要拉 1GB 模型，没有意义）。
+      - name: 单元 + 集成测试
+        run: python -m pytest tests -q
+
+      # 评测集自检：确认所有标注的 chunk_id 在**当前语料**里仍然存在。
+      # 这一步专门防"改了 PDF 忘了重建评测集"——那种情况下评测会静默变成 Recall=0，
+      # 看起来像"检索效果崩了"，实际是标注失效。
+      - name: 评测集标注有效性自检
+        run: python scripts/build_eval_set.py --check

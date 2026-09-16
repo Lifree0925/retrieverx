@@ -1,2 +1,47 @@
-{"query":"SKU A123 的销售额是多少","relevant_chunk_ids":["REPLACE_WITH_REAL_CHUNK_ID"],"query_type":"EXACT"}
-{"query":"为什么最近销售下降","relevant_chunk_ids":["REPLACE_WITH_REAL_CHUNK_ID"],"query_type":"SEMANTIC"}
+{"query": "QX-8800 双控制器切换需要多长时间", "relevant_chunk_ids": ["d2fb9b08-de77-593f-92e7-479eccdff931"], "query_type": "NUMERIC", "source_document": "QX-8800 企业级全闪存存储阵列产品手册.pdf"}
+{"query": "QX-8800 的随机读写 IOPS 分别是多少", "relevant_chunk_ids": ["f34d5da9-5076-512e-8dd3-053917d10358"], "query_type": "NUMERIC", "source_document": "QX-8800 企业级全闪存存储阵列产品手册.pdf"}
+{"query": "开启压缩和重删对性能有什么影响", "relevant_chunk_ids": ["f34d5da9-5076-512e-8dd3-053917d10358"], "query_type": "SEMANTIC", "source_document": "QX-8800 企业级全闪存存储阵列产品手册.pdf"}
+{"query": "QX-8800-P 型号的裸容量和报价是多少", "relevant_chunk_ids": ["6dc52264-dfd3-5843-8f83-c497a9f7941e"], "query_type": "NUMERIC", "source_document": "QX-8800 企业级全闪存存储阵列产品手册.pdf"}
+{"query": "关键业务服务等级的现场到达时限是多久", "relevant_chunk_ids": ["e378caf5-5de4-5174-a3c2-c7ea66b41347"], "query_type": "EXACT", "source_document": "QX-8800 企业级全闪存存储阵列产品手册.pdf"}
+{"query": "同步复制对两端链路延迟有什么硬性要求", "relevant_chunk_ids": ["c09eacdc-f28f-5f36-9cd3-205d6de18c31"], "query_type": "NUMERIC", "source_document": "QX-8800 企业级全闪存存储阵列产品手册.pdf"}
+{"query": "远程复制高级版支持哪些额外能力", "relevant_chunk_ids": ["c09eacdc-f28f-5f36-9cd3-205d6de18c31"], "query_type": "EXACT", "source_document": "QX-8800 企业级全闪存存储阵列产品手册.pdf"}
+{"query": "未休完的年休假最多能结转多少天", "relevant_chunk_ids": ["61b92494-8b08-5edb-868b-3cc5af724a6b"], "query_type": "NUMERIC", "source_document": "员工手册与人事管理制度.pdf"}
+{"query": "产假和陪产假分别有多少天", "relevant_chunk_ids": ["55dbcce7-c071-5ef1-b58e-0d34b1c0bd6f", "3d6d42aa-5eb0-567e-b6c9-e4cde2d7f59d"], "query_type": "NUMERIC", "source_document": "员工手册与人事管理制度.pdf"}
+{"query": "年中入职的员工当年年休假怎么折算", "relevant_chunk_ids": ["61b92494-8b08-5edb-868b-3cc5af724a6b"], "query_type": "SEMANTIC", "source_document": "员工手册与人事管理制度.pdf"}
+{"query": "正式员工离职要提前多久通知公司", "relevant_chunk_ids": ["04a08e2d-3240-5cf2-9783-3b4874d2c037"], "query_type": "NUMERIC", "source_document": "员工手册与人事管理制度.pdf"}
+{"query": "竞业限制期间的补偿金标准是多少", "relevant_chunk_ids": ["04a08e2d-3240-5cf2-9783-3b4874d2c037"], "query_type": "NUMERIC", "source_document": "员工手册与人事管理制度.pdf"}
+{"query": "加班换来的调休有效期是多久", "relevant_chunk_ids": ["55dbcce7-c071-5ef1-b58e-0d34b1c0bd6f", "61b92494-8b08-5edb-868b-3cc5af724a6b"], "query_type": "NUMERIC", "source_document": "员工手册与人事管理制度.pdf"}
+{"query": "医疗期时长是根据什么确定的", "relevant_chunk_ids": ["61b92494-8b08-5edb-868b-3cc5af724a6b"], "query_type": "SEMANTIC", "source_document": "员工手册与人事管理制度.pdf"}
+{"query": "P1 级别故障的判定标准是什么", "relevant_chunk_ids": ["e0ad0b61-4920-53e2-adb1-33bccf0ad50f"], "query_type": "EXACT", "source_document": "IT 服务与故障响应标准作业程序.pdf"}
+{"query": "哪些情况必须立即升级故障等级", "relevant_chunk_ids": ["f61a3cb4-2001-52ba-a753-ad4487419a37"], "query_type": "SEMANTIC", "source_document": "IT 服务与故障响应标准作业程序.pdf"}
+{"query": "生产环境变更申请要提前多久提交", "relevant_chunk_ids": ["f61a3cb4-2001-52ba-a753-ad4487419a37"], "query_type": "NUMERIC", "source_document": "IT 服务与故障响应标准作业程序.pdf"}
+{"query": "没有回滚方案的变更能不能审批", "relevant_chunk_ids": ["48681b33-377a-59b5-b65b-0e42b7320df6"], "query_type": "EXACT", "source_document": "IT 服务与故障响应标准作业程序.pdf"}
+{"query": "数据库备份文件保留多长时间", "relevant_chunk_ids": ["f3e80cef-0bb2-5c33-ab97-43b668ce05a2"], "query_type": "NUMERIC", "source_document": "IT 服务与故障响应标准作业程序.pdf"}
+{"query": "恢复演练多久做一次，要记录什么指标", "relevant_chunk_ids": ["f3e80cef-0bb2-5c33-ab97-43b668ce05a2"], "query_type": "SEMANTIC", "source_document": "IT 服务与故障响应标准作业程序.pdf"}
+{"query": "故障复盘文档对改进措施一栏有什么要求", "relevant_chunk_ids": ["48681b33-377a-59b5-b65b-0e42b7320df6"], "query_type": "SEMANTIC", "source_document": "IT 服务与故障响应标准作业程序.pdf"}
+{"query": "系统口令的有效期是多久", "relevant_chunk_ids": ["9656c8b8-ac78-5112-9a98-b93b5a116b83"], "query_type": "NUMERIC", "source_document": "信息安全管理规范.pdf"}
+{"query": "哪些系统强制要求启用多因素认证", "relevant_chunk_ids": ["c34d70f1-9c4c-5fe1-8347-784e817eebe2"], "query_type": "EXACT", "source_document": "信息安全管理规范.pdf"}
+{"query": "L3 级别的保密数据都有哪些典型内容", "relevant_chunk_ids": ["e1adcfce-0ef8-5679-880c-50481f3cdde8"], "query_type": "EXACT", "source_document": "信息安全管理规范.pdf"}
+{"query": "受控外发链接的有效期最长是多少天", "relevant_chunk_ids": ["5386ab6c-e0e6-5a69-8d56-2b7b0adf87cb"], "query_type": "NUMERIC", "source_document": "信息安全管理规范.pdf"}
+{"query": "发现疑似安全事件要在多久内上报", "relevant_chunk_ids": ["7ce72b55-c40e-5aec-a432-2562fafb4c0d"], "query_type": "NUMERIC", "source_document": "信息安全管理规范.pdf"}
+{"query": "安全审计日志要保存多久，谁能查阅", "relevant_chunk_ids": ["5386ab6c-e0e6-5a69-8d56-2b7b0adf87cb"], "query_type": "NUMERIC", "source_document": "信息安全管理规范.pdf"}
+{"query": "为什么制度要规定主动上报安全事件不予追责", "relevant_chunk_ids": ["7ce72b55-c40e-5aec-a432-2562fafb4c0d"], "query_type": "SEMANTIC", "source_document": "信息安全管理规范.pdf"}
+{"query": "十万到一百万的采购由谁审批", "relevant_chunk_ids": ["3fc63fd5-9e12-52b2-a2e3-a3f05cc500be", "85d15c0e-7f2b-5c1f-b944-2bdd9111f0e7"], "query_type": "EXACT", "source_document": "采购与供应商管理制度.pdf"}
+{"query": "一百万以上的采购需要几家供应商报价", "relevant_chunk_ids": ["3fc63fd5-9e12-52b2-a2e3-a3f05cc500be"], "query_type": "NUMERIC", "source_document": "采购与供应商管理制度.pdf"}
+{"query": "单一来源采购占比超过多少需要书面解释", "relevant_chunk_ids": ["85d15c0e-7f2b-5c1f-b944-2bdd9111f0e7"], "query_type": "NUMERIC", "source_document": "采购与供应商管理制度.pdf"}
+{"query": "供应商年度评估里交付准时率占多少权重", "relevant_chunk_ids": ["e0aea920-62ae-58be-877b-84e663fe819a"], "query_type": "NUMERIC", "source_document": "采购与供应商管理制度.pdf"}
+{"query": "设备类采购要留多少质保金", "relevant_chunk_ids": ["b73425df-35b1-55cb-bbda-5ec87539e008"], "query_type": "NUMERIC", "source_document": "采购与供应商管理制度.pdf"}
+{"query": "紧急采购每季度最多可以走几次", "relevant_chunk_ids": ["85d15c0e-7f2b-5c1f-b944-2bdd9111f0e7"], "query_type": "NUMERIC", "source_document": "采购与供应商管理制度.pdf"}
+{"query": "发票内容与实际采购标的不一致会有什么后果", "relevant_chunk_ids": ["b73425df-35b1-55cb-bbda-5ec87539e008"], "query_type": "SEMANTIC", "source_document": "采购与供应商管理制度.pdf"}
+{"query": "住宿费的限额是按什么划分的", "relevant_chunk_ids": ["fe843e9c-6a3c-5b35-9ccd-bf9c59bd2507", "c1a40529-8ee0-5def-86ee-8c1b9b1e5828"], "query_type": "EXACT", "source_document": "财务报销管理规定.pdf"}
+{"query": "费用发生后要在多久内提交报销", "relevant_chunk_ids": ["5c427e59-f919-55e9-bbb5-27d4786823ef"], "query_type": "NUMERIC", "source_document": "财务报销管理规定.pdf"}
+{"query": "五万元以上的报销需要谁审批", "relevant_chunk_ids": ["5c427e59-f919-55e9-bbb5-27d4786823ef"], "query_type": "EXACT", "source_document": "财务报销管理规定.pdf"}
+{"query": "借款必须在多久内完成核销", "relevant_chunk_ids": ["dbe4e540-dbfa-535d-aa23-cb5df42eb064"], "query_type": "NUMERIC", "source_document": "财务报销管理规定.pdf"}
+{"query": "哪些个人消费性质的费用不予报销", "relevant_chunk_ids": ["fe843e9c-6a3c-5b35-9ccd-bf9c59bd2507", "66d5e30d-2e80-531c-b84b-f59728be610f"], "query_type": "EXACT", "source_document": "财务报销管理规定.pdf"}
+{"query": "单笔一万元以下的报销由谁终审", "relevant_chunk_ids": ["5c427e59-f919-55e9-bbb5-27d4786823ef"], "query_type": "EXACT", "source_document": "财务报销管理规定.pdf"}
+{"query": "对外赠送礼品单件金额上限是多少", "relevant_chunk_ids": ["5c427e59-f919-55e9-bbb5-27d4786823ef"], "query_type": "NUMERIC", "source_document": "财务报销管理规定.pdf"}
+{"query": "PX-4200 整机的标准保修期是多久", "relevant_chunk_ids": ["e8910027-2f01-5cdc-9016-313e5b340e39"], "query_type": "NUMERIC", "source_document": "产品手册-PX4200.pdf"}
+{"query": "PX-4200-B 配置的含税价格是多少", "relevant_chunk_ids": ["f87156b8-c763-5d78-9a85-990588637612"], "query_type": "NUMERIC", "source_document": "产品手册-PX4200.pdf"}
+{"query": "设备签收后多少天内可以申请无理由退货", "relevant_chunk_ids": ["88a7799b-9162-53a1-8601-a9f6d268a4b9"], "query_type": "NUMERIC", "source_document": "产品手册-PX4200.pdf"}
+{"query": "高级服务等级的响应时间是多少", "relevant_chunk_ids": ["daefdb52-9f58-5f7f-b25c-8d6f616ffb7c"], "query_type": "EXACT", "source_document": "产品手册-PX4200.pdf"}
+{"query": "哪些情形不属于免费保修范围", "relevant_chunk_ids": ["e8910027-2f01-5cdc-9016-313e5b340e39"], "query_type": "SEMANTIC", "source_document": "产品手册-PX4200.pdf"}

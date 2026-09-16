@@ -1,0 +1,48 @@
+{
+  "dataset": "evaluation.jsonl",
+  "samples": 47,
+  "chunk_universe": 39,
+  "query_types": {
+    "NUMERIC": 26,
+    "SEMANTIC": 9,
+    "EXACT": 12
+  },
+  "documents": {
+    "QX8800": {
+      "file": "QX-8800 企业级全闪存存储阵列产品手册.pdf",
+      "sha256": "b730e6f6d0d5cfe6c74e3164c49ef42499fb173ff79c8100f8e34604660850b7",
+      "chunks": 6
+    },
+    "员工手册": {
+      "file": "员工手册与人事管理制度.pdf",
+      "sha256": "86eb27eb885a03e33b83bbf471aebb98bbefe9c0fd87632b75f3a828d65ab616",
+      "chunks": 5
+    },
+    "IT服务": {
+      "file": "IT 服务与故障响应标准作业程序.pdf",
+      "sha256": "7223d11a27c7402a737bd5aa8aa645ab712799ec8ba34f876482c7225858ebc1",
+      "chunks": 6
+    },
+    "信息安全": {
+      "file": "信息安全管理规范.pdf",
+      "sha256": "12a62d7f30b4a0d707147b77ec78496eb96bcc5831ac1cbdf866409dc80f4ff7",
+      "chunks": 5
+    },
+    "采购制度": {
+      "file": "采购与供应商管理制度.pdf",
+      "sha256": "3ab56c61e374afaca177293355571993d88d23c792ecc29f9eb5ded12aa31791",
+      "chunks": 5
+    },
+    "财务报销": {
+      "file": "财务报销管理规定.pdf",
+      "sha256": "359870058691314ff02f8689861356387e1b7b0ef50cc5868a4cbe8bd66c5e51",
+      "chunks": 5
+    },
+    "PX4200": {
+      "file": "产品手册-PX4200.pdf",
+      "sha256": "02fcb66f118bd9e9e1395fd566720f436af9a0059ddd39c7d928e44ff2d44959",
+      "chunks": 7
+    }
+  },
+  "note": "chunk_id 由 PDF 内容 sha256 派生。语料一旦改动，本评测集立即失效，用 `python scripts/build_eval_set.py --check` 可以发现。"
+}

@@ -13,7 +13,30 @@ retrieval_policy.py —— 检索策略（Retrieval Policy）
 """
 from dataclasses import dataclass
 
+from app.config import settings
 from app.core.query_classifier import QueryType
+
+# 各查询类型相对基准权重的偏移量。
+# 领域直觉：EXACT/NUMERIC 靠精确词匹配，BM25 该更重；SEMANTIC 靠语义，向量该更重。
+# 默认基准是 0.5/0.5，偏移 0.2 之后正好得到 0.7/0.3 与 0.3/0.7，
+# 与改造前的硬编码值一致（所以这次改动是行为不变的，只是让 .env 真的生效）。
+_TYPE_TILT = 0.2
+
+
+def _weight_pair(base_bm25: float, base_vector: float, shift: float) -> tuple[float, float]:
+    """在基准权重上做一次偏移并归一化到和为 1。"""
+    bm25 = min(1.0, max(0.0, base_bm25 + shift))
+    vector = min(1.0, max(0.0, base_vector - shift))
+    total = bm25 + vector
+    if total <= 0:
+        return 0.5, 0.5
+    return bm25 / total, vector / total
+
+
+def _round_pair(pair: tuple[float, float]) -> tuple[float, float]:
+    """把权重四舍五入到 4 位，避免 0.7000000000000001 这类浮点噪声写进接口响应。"""
+    bm25, vector = pair
+    return round(bm25, 4), round(vector, 4)
 
 
 @dataclass
@@ -26,22 +49,37 @@ class Policy:
 
 
 class RetrievalPolicy:
-    def __init__(self, min_samples: int = 20, max_step: float = 0.1):
+    def __init__(
+        self,
+        min_samples: int = 20,
+        max_step: float = 0.1,
+        base_bm25: float | None = None,
+        base_vector: float | None = None,
+    ):
         """
-        min_samples  最少需要多少条反馈才允许调整权重（防误操作）
-        max_step     单次最大调整步长（防抖动）
+        min_samples   最少需要多少条反馈才允许调整权重（防误操作）
+        max_step      单次最大调整步长（防抖动）
+        base_bm25 / base_vector
+                      融合权重的基准比例。默认取 settings.bm25_weight / vector_weight，
+                      这样 .env 里改 BM25_WEIGHT / VECTOR_WEIGHT 才会真正影响检索。
+                      测试里可以显式传入，避免被外部 .env 影响。
         """
         self.min_samples = min_samples
         self.max_step = max_step
 
-        # 每种查询类型的初始策略（领域直觉，冷启动默认值）：
-        #   EXACT/NUMERIC 以精确词为主 → BM25 权重大；
-        #   SEMANTIC 以语义为主 → 向量权重大；MIXED 各半。
+        base_bm25 = settings.bm25_weight if base_bm25 is None else base_bm25
+        base_vector = settings.vector_weight if base_vector is None else base_vector
+
+        exact = _round_pair(_weight_pair(base_bm25, base_vector, +_TYPE_TILT))
+        semantic = _round_pair(_weight_pair(base_bm25, base_vector, -_TYPE_TILT))
+        mixed = _round_pair(_weight_pair(base_bm25, base_vector, 0.0))
+
+        # 每种查询类型的初始策略（领域直觉，冷启动默认值）
         self.policies: dict[QueryType, Policy] = {
-            QueryType.EXACT: Policy(bm25=0.7, vector=0.3),
-            QueryType.SEMANTIC: Policy(bm25=0.3, vector=0.7),
-            QueryType.MIXED: Policy(bm25=0.5, vector=0.5),
-            QueryType.NUMERIC: Policy(bm25=0.7, vector=0.3),
+            QueryType.EXACT: Policy(bm25=exact[0], vector=exact[1]),
+            QueryType.SEMANTIC: Policy(bm25=semantic[0], vector=semantic[1]),
+            QueryType.MIXED: Policy(bm25=mixed[0], vector=mixed[1]),
+            QueryType.NUMERIC: Policy(bm25=exact[0], vector=exact[1]),
         }
         # 更新历史：[(query_type, 旧策略, 新策略), ...]，供回滚
         self.history: list[tuple[QueryType, Policy, Policy]] = []

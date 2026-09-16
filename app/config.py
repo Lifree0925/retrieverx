@@ -42,9 +42,10 @@ class Settings(BaseSettings):
     elasticsearch_url: str = "http://localhost:9200"  # Docker 部署时改为 http://elasticsearch:9200
     elasticsearch_index: str = "retrieverx_chunks"    # ES 索引名
 
-    # ---------- Redis（反馈存储 / 更正缓存）----------
+    # ---------- Redis（反馈存储 / 更正缓存 / Trace 存储）----------
     redis_url: str = "redis://localhost:6379/0"
     feedback_ttl: int = 2592000                       # 反馈过期时间（秒），默认 30 天
+    trace_ttl: int = 86400                            # Retrieval Trace 保留时长（秒），默认 1 天
 
     # ---------- Reranker（精排模型）----------
     reranker_model: str = "BAAI/bge-reranker-base"    # 本地 Cross-Encoder 模型
@@ -67,15 +68,25 @@ class Settings(BaseSettings):
 
     # ---------- 检索链路参数 ----------
     default_top_k: int = Field(default=5, ge=1, le=100)     # 对外默认返回条数
+                                                            # （app/models/retrieval.py 的 SearchRequest 读它）
     recall_top_k: int = Field(default=20, ge=1, le=200)     # 内部召回条数（先召回再融合再精排）
     rrf_k: int = Field(default=60, ge=1)                    # RRF 融合常数 k
-    bm25_weight: float = Field(default=0.5, ge=0.0, le=1.0)   # 融合默认权重（BM25 侧）
-    vector_weight: float = Field(default=0.5, ge=0.0, le=1.0) # 融合默认权重（向量侧）
-    confidence_threshold: float = Field(default=0.5, ge=0.0, le=1.0)  # 预留：置信度阈值
+
+    # 融合权重的**基准比例**，由 RetrievalPolicy 派生各查询类型的具体权重
+    # （见 app/core/retrieval_policy.py）。
+    #
+    # 【为什么要重写成"基准 + 偏移"而不是每类型写死】
+    #   原来这两个字段**没有任何代码读**，真实权重硬编码在 RetrievalPolicy 里——
+    #   也就是说 .env.example 在引导你调两个不起作用的开关，属于"文档里写了、代码里没有"。
+    #   现在改成：这两个值定义基线（默认各 0.5），
+    #   再按查询类型做固定偏移（EXACT/NUMERIC 偏 BM25、SEMANTIC 偏向量），
+    #   默认值下算出来的结果与原硬编码值完全一致（0.7/0.3、0.3/0.7、0.5/0.5），
+    #   但从此**改 .env 真的会生效**。
+    bm25_weight: float = Field(default=0.5, ge=0.0, le=1.0)   # 基准权重（BM25 侧）
+    vector_weight: float = Field(default=0.5, ge=0.0, le=1.0) # 基准权重（向量侧）
 
     # ---------- 检索策略（Policy）自适应约束 ----------
     policy_min_samples: int = Field(default=20, ge=1)   # 少于该样本数不允许调策略，防误操作带偏
-    policy_window_size: int = Field(default=100, ge=1)  # 滑动窗口大小（预留）
     policy_max_step: float = Field(default=0.1, ge=0.0, le=1.0)  # 单次调整的最大步长
 
     # 告诉 pydantic：从 .env 读配置；.env 里多余字段忽略不报错

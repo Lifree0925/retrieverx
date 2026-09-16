@@ -94,13 +94,74 @@ streamlit run streamlit_app.py
 | 预下载精排模型（建议部署时跑一次） | `python scripts/download_models.py` |
 | 重置索引后重新索引 | `python scripts/index_documents.py xxx.pdf --reset` |
 | 只解析不写库（调试切块） | `python scripts/index_documents.py xxx.pdf --dry-run` |
-| 生成评测集模板 | `python scripts/export_evaluation_template.py --pdf xxx.pdf` |
+| 生成企业文档语料（6 份手册/制度类 PDF） | `python scripts/make_enterprise_corpus.py` |
+| 生成评测集（真实 chunk_id，逐条校验） | `python scripts/build_eval_set.py` |
+| 校验评测集是否仍然有效（语料改过就会失效） | `python scripts/build_eval_set.py --check` |
 | 跑评测（消融） | `python scripts/run_evaluation.py --all` |
+| 跑失败分析（归类失败根因） | `python scripts/run_failure_analysis.py` |
+| 跑切块消融（固定 vs 结构感知） | `python scripts/run_chunking_ablation.py xxx.pdf` |
+| 跑反馈前后实验 | `python scripts/run_feedback_experiment.py` |
 | 跑单元测试 | `pytest tests/unit -v` |
 
 > 没装 Docker、或不确定 ES/Qdrant/Redis 该怎么在 Windows 上跑？
 > 最省事的是用本仓库自带的 `docker-compose.yml` 只起这三个中间件，
 > 再在本机跑 uvicorn 与 streamlit（对应上面的「方式 A」）。
+
+## 评测闭环：怎么拿到可复现的数字
+
+评测集不是手写的，而是**从语料派生出来的**，这保证了标注里每个 `chunk_id` 都真实存在。
+
+```bash
+# 1) 定稿语料（改完就不要再动它）
+python scripts/make_enterprise_corpus.py     # 生成 6 份企业文档 · 7 份共 39 个 chunk
+# 2) 建索引（把语料写进 ES + Qdrant）
+python scripts/index_documents.py data/corpus/*.pdf
+# 3) 生成评测集（用与建索引相同的解析/切块流程算出 chunk_id）
+python scripts/build_eval_set.py
+# 4) 跑评测
+python scripts/run_evaluation.py --all
+```
+
+**为什么 chunk_id 可以离线算出来**：`document_id` 由文件内容 sha256 派生，
+`chunk_id` 再由 `document_id + 页号 + 页内序号` 派生（见 `app/core/parser.py`）。
+所以"语料 PDF + 同一套解析切块代码"就能唯一确定全部 chunk_id，
+不需要先起 ES/Qdrant 再手工抄 UUID——手抄一批 UUID 是没法维护的。
+
+**标注怎么保证不自欺**：每条问题给一组"答案短语"，脚本在全语料的 chunk 池里定位它们，
+命中的 chunk 就标为相关。短语一个都找不到就**整体失败退出、不写文件**——
+不会出现"标注看着填了、其实指向不存在的 chunk"这种最隐蔽的错误。
+
+> ⚠️ **顺序不能反**：chunk_id 由文件内容哈希派生，
+> **先定稿语料 → 再建索引 → 最后造评测集**。造完评测集又回头改 PDF，
+> 旧标注会集体失效，表现为"Recall 突然掉到 0"——很难联想到是 PDF 本身变了。
+> 发现它的方法：`python scripts/build_eval_set.py --check`。
+
+### 跑评测前会先体检评测集
+
+`run_evaluation.py` 在连任何服务之前先做前置校验：
+
+| 情况 | 处理 |
+|---|---|
+| `relevant_chunk_ids` 还是 `REPLACE_WITH_REAL_CHUNK_ID` 占位符 | **拒绝运行**（说明评测集从没真正标注过） |
+| 标注指向当前语料里不存在的 chunk_id | **拒绝运行**（几乎总是语料被改过） |
+| 某些样本没有人工标注 | 警告，并**排除出指标分母**（记为 `unverifiable`，不算失败） |
+| 同一条问题重复出现 | 警告（预测按位置对齐，不会互相覆盖，但会重复计分） |
+
+为什么要这么严：**一个"能跑但毫无意义"的评测比直接报错危险得多**。
+占位符评测集照样能跑完、照样打印指标，只是全是 0——
+没有这道闸门，很容易把"标注没填"误读成"检索效果差"。
+
+确实想看坏数据下的现象，加 `--allow-stale-dataset`（结果不可用于下结论）。
+
+### 指标口径：三个数一起看
+
+除 `Recall@K / MRR@K / NDCG@K` 外，还会给出：
+
+- `evaluated` —— **真正参与平均**的条数（有人工标注的那些），指标分母就是它；
+- `unverifiable` —— 缺人工标注、无法判定的条数。
+
+分母只算 `evaluated` 是刻意的：拿总条数当分母，评测集标注补齐/删减一点，
+指标就跟着漂，看起来像"模型变差了"，其实是"标注没填"。
 
 ## 常见问题
 
@@ -276,6 +337,7 @@ PDF 里的换行是**视觉换行**（排到页宽就断），不是语义换行
 | GET | `/health` | 健康检查 |
 | GET | `/stats` | 索引 / 反馈统计 |
 | GET | `/metrics` | 指标占位（真正的实验指标看 run_evaluation.py） |
+| GET | `/trace/{request_id}` | 回查某次检索的完整链路 Trace（request_id 见 `/search` 响应） |
 
 `DELETE` 的存在意义：改过的 PDF 重新上传会得到一批新 Chunk ID，旧 Chunk 会残留，
 以前只能 `--reset` 清空整个索引，多文档场景下不可接受。
@@ -288,6 +350,8 @@ streamlit run streamlit_app.py   # http://localhost:8501
 
 - **检索**：提问 → 指标卡（耗时 / 策略 / 更正缓存 / 精排是否生效）+ 结果卡片
   （来源文档、页码、标题路径、类型、双路命中标记、融合分与精排分），每条都能 👍/👎；
+  另有一个「链路 Trace」折叠区，把 BM25 / 向量 / RRF / 精排各阶段的 Top-N 与延迟分解摊开
+  —— 对应 [开发文档](docs/开发文档.md) 的 **WP18（Retrieval Debugger）**：不仅看结果，还能解释结果是怎么来的。
 - **文档库**：上传建索引、查看已索引文档列表、按文档删除；
 - **反馈闭环**：提交更正写法，再搜原问题即可看到 `used_correction=true` 与结果改写。
 
@@ -296,5 +360,6 @@ streamlit run streamlit_app.py   # http://localhost:8501
 
 ## 诚实原则
 
-评测集的 `relevant_chunk_ids` 必须是**真实存在的 chunk_id**（用 `export_evaluation_template.py` 生成后人工核对）。
+评测集的 `relevant_chunk_ids` 必须是**真实存在的 chunk_id**（用 `scripts/build_eval_set.py` 生成，
+它按"答案短语"定位并逐条校验；改过语料就用 `--check` 复查）。
 Recall/MRR/NDCG、延迟、成本等数字必须来自 `run_evaluation.py` 的真实输出，禁止虚构。

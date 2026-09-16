@@ -272,6 +272,42 @@ with tab_search:
         if use_rerank and not result.get("rerank_applied"):
             st.info("本次结果显示为融合排序（精排被降级或未开启），后端日志里有具体原因。")
 
+        # ---- 链路 Trace：不仅看结果，还能解释结果是怎么来的（WP18 Retrieval Debugger） ----
+        if result.get("request_id"):
+            with st.expander("🔬 查看链路 Trace（各阶段召回与排序）", expanded=False):
+                trace, terr = api_get(API_URL, f"/trace/{result['request_id']}")
+                if terr:
+                    st.caption(f"Trace 不可用：{terr}")
+                else:
+                    st.caption(
+                        f"查询类型 {trace.get('query_type')} · 策略 v{trace.get('policy', {}).get('version')} · "
+                        f"BM25 {trace.get('latency_breakdown', {}).get('bm25_ms', 0):.0f}ms / "
+                        f"向量 {trace.get('latency_breakdown', {}).get('vector_ms', 0):.0f}ms / "
+                        f"融合 {trace.get('latency_breakdown', {}).get('fusion_ms', 0):.0f}ms / "
+                        f"精排 {trace.get('latency_breakdown', {}).get('reranker_ms', 0):.0f}ms"
+                    )
+
+                    def _stage(name: str, cands: list, key: str):
+                        st.markdown(f"**{name}**（{len(cands)} 条）")
+                        if not cands:
+                            st.caption("（空）")
+                            return
+                        lines = []
+                        for c in cands[:5]:
+                            m = c.get("retrieval_method", "")
+                            score = c.get(f"{key}_score") if key else ""
+                            score_txt = f"{score:.4f}" if isinstance(score, (int, float)) else str(score)
+                            lines.append(f"{c.get('rank')}. `{c.get('chunk_id', '')[:8]}…` [{m}] {score_txt}")
+                        st.code("\n".join(lines), language=None)
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        _stage("BM25 召回 Top-5", trace.get("bm25_candidates", []), "original")
+                        _stage("RRF 融合 Top-5", trace.get("rrf_candidates", []), "fusion")
+                    with col2:
+                        _stage("向量召回 Top-5", trace.get("vector_candidates", []), "original")
+                        _stage("最终 Top-5", trace.get("final_candidates", []), "fusion")
+
         candidates = result["candidates"]
         st.caption(f"命中 {len(candidates)} 条　·　问题：{result['query']}")
         if not candidates:

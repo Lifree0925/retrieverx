@@ -1,7 +1,16 @@
 """
 scripts/export_evaluation_template.py —— 从已索引数据生成评测集模板
 
-【为什么需要它？】
+【⚠️ 做正式评测请改用 scripts/build_eval_set.py】
+  本脚本保留是为了"手头只有一份任意 PDF、想快速攒一批候选"这种临时场景：
+  它按关键词粗筛出候选 chunk，需要**人工核对**后才能用。
+
+  正式评测请用 `scripts/build_eval_set.py`：它面向整套语料，
+  按"答案短语"精确定位相关 chunk，且**逐条校验短语确实命中**——
+  短语找不到就整体失败退出，不会产出"看着填了、其实指向不存在 chunk"的标注。
+  （评测集正确性是可以机械验证的，不该依赖人工核对。）
+
+【原来为什么需要它】
   data/evaluation.jsonl 里的 relevant_chunk_ids 必须是"真实存在的 chunk_id"才能跑评测。
   手写 UUID 容易错。这个脚本把当前索引里的 Chunk 导出成"候选池"，
   你再把每条问题的正确答案 id 填进去。
@@ -9,7 +18,7 @@ scripts/export_evaluation_template.py —— 从已索引数据生成评测集�
 【用法】
   1. 先索引你的 PDF：python scripts/index_documents.py ./data/产品手册.pdf
   2. 运行：python scripts/export_evaluation_template.py --pdf 产品手册.pdf
-     会生成 data/evaluation_template.jsonl，每条样本的 relevant_chunk_ids 已帮你挑好最相关的候选；
+     会生成 data/evaluation_template.jsonl，每条样本的 relevant_chunk_ids 已帮你挑好最可能的候选；
   3. 人工检查 / 修改后，另存为 data/evaluation.jsonl 再跑评测。
 
 【说明】

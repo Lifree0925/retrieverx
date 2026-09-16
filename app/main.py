@@ -32,16 +32,30 @@ from app.utils.logging import configure_logging
 configure_logging(settings.log_level)
 
 # 创建应用实例
-app = FastAPI(title=settings.app_name, version="2.0.0")
+#
+# app_env 在这里真正起作用：production 环境关闭 Swagger / ReDoc 文档页。
+# 原因：本项目接口目前**没有鉴权**，文档页会把全部接口签名、
+# 请求体结构与在线调试入口直接暴露出去——生产环境等于送人一份攻击清单。
+# 开发环境保留文档页，方便在线调试。
+_is_production = settings.app_env.strip().lower() in ("production", "prod")
+app = FastAPI(
+    title=settings.app_name,
+    version="2.0.0",
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
+)
 
 # 挂载路由（模块末尾 import 放在 include 前，避免加载 app.main 时的循环依赖）
 from app.api.routes_documents import router as documents_router  # noqa: E402
 from app.api.routes_feedback import router as feedback_router    # noqa: E402
 from app.api.routes_search import router as search_router        # noqa: E402
+from app.api.routes_trace import router as trace_router          # noqa: E402
 
 app.include_router(search_router)
 app.include_router(feedback_router)
 app.include_router(documents_router)
+app.include_router(trace_router)
 
 
 @app.get("/")
@@ -62,6 +76,7 @@ def root():
             "POST /search": "混合检索主接口",
             "POST /feedback": "提交反馈（点赞/点踩）",
             "POST /documents/index": "上传 PDF/文本并解析入库",
+            "GET /trace/{request_id}": "回查某次检索的完整链路 Trace（request_id 见 /search 响应）",
         },
         "ui_hint": "图形化演示界面请另开终端执行: streamlit run streamlit_app.py，然后访问 http://localhost:8501",
     }

@@ -11,12 +11,16 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.config import settings
+
 
 class RetrievalRequest(BaseModel):
     """POST /search 的请求体。FastAPI 会自动校验这些字段。"""
 
     query: str = Field(min_length=1, max_length=500)  # 查询问题，不能为空
-    top_k: int = Field(default=5, ge=1, le=100)        # 返回条数（1~100）
+    # 返回条数（1~100）。默认值取自 settings.default_top_k，
+    # 这样 .env 里的 DEFAULT_TOP_K 才是真的可调（否则又是一个"文档里写了、代码里没人读"的开关）。
+    top_k: int = Field(default_factory=lambda: settings.default_top_k, ge=1, le=100)
     rerank: bool = True                                # 本次是否启用 Cross-Encoder 精排
     # 限定检索范围：给了就只在这一份文档内检索；不传则跨全部文档
     document_id: UUID | None = None
@@ -54,9 +58,36 @@ class RetrievalPolicySnapshot(BaseModel):
 class RetrievalResponse(BaseModel):
     """POST /search 的响应体。"""
 
+    request_id: str                                    # 本次检索的唯一标识（可用于 GET /trace/{request_id}）
     query: str                                         # 原始查询
     candidates: list[Candidate]                        # 排序后的候选结果
     latency_ms: float                                  # 整条管线总耗时（毫秒）
     retrieval_policy: RetrievalPolicySnapshot          # 本次使用的策略快照
     used_correction: bool = False                      # 是否命中了用户的更正缓存
+    # 更正缓存（Redis）本次是否可用。false 表示降级了——检索照常返回，
+    # 但"这次没用到历史更正"这件事必须让调用方看得见，而不是静默当作"没有更正"。
+    correction_available: bool = True
     rerank_applied: bool = False                       # 本次是否真的做了精排（false=被降级/未开启）
+
+
+class RetrievalTrace(BaseModel):
+    """一次检索的完整链路 Trace（docs/开发文档.md 的 WP9 / Retrieval Debugger 的数据基础）。
+
+    与 RetrievalResponse 的区别：Response 只给"最终结果"，Trace 给"过程"——
+    双路各召回了什么、融合/精排前后排序怎么变、每个阶段花了多少毫秒。
+    由 pipeline 在每次请求时构建并写入 TraceStore。
+    """
+
+    request_id: str                                    # 请求唯一标识
+    query: str                                         # 原始查询
+    search_query: str                                  # 实际用于检索的查询（可能被更正缓存改写）
+    query_type: str                                    # 查询分类：EXACT / SEMANTIC / MIXED / NUMERIC
+    used_correction: bool = False                      # 是否命中更正缓存
+    policy: dict = Field(default_factory=dict)         # 策略快照 {bm25, vector, version}
+    bm25_candidates: list[dict] = Field(default_factory=list)   # BM25 召回快照（含 rank）
+    vector_candidates: list[dict] = Field(default_factory=list) # 向量召回快照（含 rank）
+    rrf_candidates: list[dict] = Field(default_factory=list)    # RRF 融合后快照（含 rank）
+    final_candidates: list[dict] = Field(default_factory=list)  # 最终 Top-K（精排后，或融合后截断）
+    rerank_applied: bool = False                       # 本次是否真的精排
+    latency_breakdown: dict = Field(default_factory=dict)  # 各阶段耗时（毫秒）
+    total_latency_ms: float = 0.0                      # 总耗时（毫秒）

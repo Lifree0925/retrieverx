@@ -117,3 +117,63 @@ class StructureAwareChunker:
                 }
             )
         ]
+
+
+class FixedChunker:
+    """固定大小切块（消融实验的对照基线，docs/开发文档.md 的 WP10.2 的「不采用」方案）。
+
+    结构感知切块会按「标题 → 段落/表格」边界来切，尽量保留结构；
+    固定切块则把整份文档的文本**拍平**成一个长串，按固定字符窗口滑切，
+    完全不看标题、不区分表格、不管句子边界。
+
+    【为什么要有这个「明知不好的」类？】
+      消融实验需要对照：只有把"固定切块"和"结构感知切块"放在同一份评测集上对比，
+      才能用数据证明"结构信息保留之后 Recall 是否真的改善"（docs/开发文档.md 的 WP10.5）。
+      本类存在的唯一价值就是当那条基线，不代表生产推荐做法。
+    """
+
+    def __init__(self, chunk_size: int = 800, overlap: int = 0):
+        """
+        chunk_size  每个窗口的字符数（固定）
+        overlap     相邻窗口重叠的字符数（0 = 无重叠，纯 text[:n] 式硬切）
+        """
+        self.chunk_size = max(1, chunk_size)
+        self.overlap = max(0, min(overlap, chunk_size - 1))
+
+    def chunk(self, blocks: list[DocumentChunk]) -> list[DocumentChunk]:
+        """把所有 block 的内容拍平后按固定窗口切块。
+
+        刻意丢弃的内容（这就是"固定切块丢结构"的实证）：
+          - heading_path：置空（固定切块不感知标题层级）；
+          - content_type：一律 text（表格被拍平成普通文本，行列关系丢失）；
+          - page_number：无法精确对应，粗略取第一个 block 的页码。
+        """
+        if not blocks:
+            return []
+
+        doc_id = blocks[0].document_id
+        source_name = blocks[0].source_name
+        flat = "\n".join(b.content for b in blocks)
+
+        chunks: list[DocumentChunk] = []
+        step = self.chunk_size - self.overlap
+        start = 0
+        while start < len(flat):
+            end = min(start + self.chunk_size, len(flat))
+            content = flat[start:end]
+            if content.strip():
+                chunks.append(
+                    DocumentChunk(
+                        document_id=doc_id,
+                        source_name=source_name,
+                        content=content,
+                        content_type="text",
+                        page_number=blocks[0].page_number,
+                        heading_path=[],
+                        metadata={"chunker": "fixed", "char_span": [start, end]},
+                    )
+                )
+            start += step
+            if step <= 0:  # 防御：极端配置下避免死循环
+                break
+        return chunks
