@@ -85,6 +85,62 @@ def test_predictions_align_by_position_when_queries_repeat():
     assert result["Recall@5"] == pytest.approx(0.5)
 
 
+# ----------------------------------------------------------------------
+# 7：分组指标必须能算对"非首块"的分组
+# ----------------------------------------------------------------------
+def test_evaluate_by_split_handles_group_not_starting_at_zero():
+    """分组指标的核心陷阱：子集位置 ≠ 原评测集下标。
+
+    踩过的坑：`evaluate_by_split` 用原下标建 sub_map，而 `evaluate_predictions`
+    用子集位置算 sample_key。结果是**只有下标从 0 开始且连续的那一组能对上**：
+    47 条字面式（下标 0~46）显示 Recall 1.0，16 条改写式（下标 47~62）显示 0.0——
+    一个既不报错、又完全捏造出来的"结论"，比指标偏低危险得多。
+    """
+    from app.evaluation.ablation import evaluate_by_split
+
+    dataset = [
+        EvaluationSample(query="字面一", relevant_chunk_ids=["a"]),
+        EvaluationSample(query="字面二", relevant_chunk_ids=["a"]),
+        EvaluationSample(query="改写一", relevant_chunk_ids=["b"], paraphrased=True),
+        EvaluationSample(query="改写二", relevant_chunk_ids=["b"], paraphrased=True),
+    ]
+    # 四种预测全部正确
+    prediction_map = {"#0": ["a"], "#1": ["a"], "#2": ["b"], "#3": ["b"]}
+
+    splits = evaluate_by_split(dataset, prediction_map, k=5)
+
+    assert splits["字面式问题"]["evaluated"] == 2
+    assert splits["改写式问题"]["evaluated"] == 2
+    assert splits["字面式问题"]["Recall@5"] == pytest.approx(1.0)
+    assert splits["改写式问题"]["Recall@5"] == pytest.approx(1.0), (
+        "非首块分组恒为 0.0 说明 sub_map 用的是原下标而不是子集位置"
+    )
+
+
+def test_evaluate_by_split_matches_unsplit_metrics():
+    """分组指标按样本数加权，必须能还原成整体指标——否则两组口径与整体口径不一致。"""
+    from app.evaluation.ablation import evaluate_by_split
+
+    dataset = [
+        EvaluationSample(query="a1", relevant_chunk_ids=["x"]),
+        EvaluationSample(query="a2", relevant_chunk_ids=["y"]),
+        EvaluationSample(query="p1", relevant_chunk_ids=["y"], paraphrased=True),
+        EvaluationSample(query="p2", relevant_chunk_ids=["z"], paraphrased=True),
+    ]
+    # a1 对、a2 错、p1 对、p2 错 → 整体 Recall@5 = 0.5
+    prediction_map = {"#0": ["x"], "#1": ["x"], "#2": ["y"], "#3": ["y"]}
+
+    overall = evaluate_predictions(dataset, prediction_map, k=5)
+    splits = evaluate_by_split(dataset, prediction_map, k=5)
+    assert overall["Recall@5"] == pytest.approx(0.5)
+
+    total = sum(s["evaluated"] for s in splits.values())
+    weighted = sum(s["Recall@5"] * s["evaluated"] for s in splits.values()) / total
+    assert weighted == pytest.approx(overall["Recall@5"]), (
+        "分组加权应等于整体：不相等说明两组里有分组的预测没对上（key 口径不一致）"
+    )
+
+
 def test_sample_key_prefers_explicit_id():
     sample = EvaluationSample(query="q", relevant_chunk_ids=["a"], id="my-id")
     assert sample_key(sample, 7) == "my-id"
@@ -169,6 +225,92 @@ def test_correction_cache_success_marks_available():
 
     response = _make_service(_OkStore()).run_pipeline("华北区的销售额", use_rerank=False)
     assert response.correction_available is True
+
+
+# ----------------------------------------------------------------------
+# 6：长跑评测必须可续跑 —— 被中断不能整轮白跑
+# ----------------------------------------------------------------------
+def test_load_progress_skips_partial_line(tmp_path):
+    """进程被 kill 时最后一行可能只写了一半，不能因此丢掉前面已完成的记录。"""
+    from scripts.run_evaluation import _load_progress
+
+    path = tmp_path / "progress.jsonl"
+    path.write_text(
+        '{"mode": "hybrid_rerank", "key": "#0", "predicted": ["a"], "latency_ms": 10}\n'
+        '{"mode": "hybrid_rerank", "key": "#1", "predicted": ["b"], "latency_ms": 20}\n'
+        '{"mode": "hybrid_rerank", "key": "#2", "pred',   # ← 写到一半被终止
+        encoding="utf-8",
+    )
+    done, latencies = _load_progress(path, "hybrid_rerank")
+    assert set(done) == {"#0", "#1"}, "半行应被丢弃，但前面两条必须保留"
+    assert latencies == [10.0, 20.0]
+
+
+def test_load_progress_ignores_other_modes(tmp_path):
+    """同一份进度文件会被 4 个档位共用，续跑时不能把别的档位当成自己已完成。"""
+    from scripts.run_evaluation import _load_progress
+
+    path = tmp_path / "progress.jsonl"
+    path.write_text(
+        '{"mode": "bm25_only", "key": "#0", "predicted": ["a"], "latency_ms": 1}\n'
+        '{"mode": "hybrid", "key": "#1", "predicted": ["b"], "latency_ms": 2}\n',
+        encoding="utf-8",
+    )
+    done, _ = _load_progress(path, "hybrid_rerank")
+    assert done == {}
+
+
+def test_run_mode_resume_only_runs_remaining(tmp_path, monkeypatch):
+    """续跑的核心承诺：已完成的样本不再重跑，且结果与从头跑一致。"""
+    import scripts.run_evaluation as ev
+
+    monkeypatch.setattr(ev, "get_retrieval_service", lambda: object())
+    executed: list[str] = []
+
+    def fake_run_one(mode, service, query, top_k):
+        executed.append(query)
+        return ["a"], 5.0
+
+    monkeypatch.setattr(ev, "_run_one_query", fake_run_one)
+
+    dataset = [
+        EvaluationSample(query="q1", relevant_chunk_ids=["a"]),
+        EvaluationSample(query="q2", relevant_chunk_ids=["a"]),
+        EvaluationSample(query="q3", relevant_chunk_ids=["a"]),
+    ]
+    progress = tmp_path / "progress.jsonl"
+    progress.write_text(
+        '{"mode": "bm25_only", "key": "#0", "predicted": ["a"], "latency_ms": 7}\n',
+        encoding="utf-8",
+    )
+
+    result = ev.run_mode("bm25_only", dataset, 5, progress_path=progress, resume=True)
+
+    assert executed == ["q2", "q3"], "已完成的 #0 不该被重跑"
+    assert result["evaluated"] == 3
+    assert result["Recall@5"] == pytest.approx(1.0)
+    lines = [l for l in progress.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(lines) == 3, "续跑是追加，不能把旧记录覆盖掉"
+
+
+def test_run_mode_without_resume_starts_over(tmp_path, monkeypatch):
+    """不续跑时必须覆盖旧进度，否则新旧记录混在一起，结果不可解释。"""
+    import scripts.run_evaluation as ev
+
+    monkeypatch.setattr(ev, "get_retrieval_service", lambda: object())
+    monkeypatch.setattr(ev, "_run_one_query", lambda *a, **kw: (["a"], 5.0))
+
+    dataset = [EvaluationSample(query="q1", relevant_chunk_ids=["a"])]
+    progress = tmp_path / "progress.jsonl"
+    progress.write_text(
+        '{"mode": "bm25_only", "key": "#0", "predicted": ["zzz"], "latency_ms": 1}\n',
+        encoding="utf-8",
+    )
+
+    ev.run_mode("bm25_only", dataset, 5, progress_path=progress, resume=False)
+    lines = [l for l in progress.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(lines) == 1
+    assert "zzz" not in lines[0], "不续跑应覆盖，而不是把上一轮的预测留在文件里"
 
 
 # ----------------------------------------------------------------------

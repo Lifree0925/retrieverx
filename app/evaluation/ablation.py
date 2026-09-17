@@ -75,3 +75,42 @@ def evaluate_predictions(dataset, prediction_map, k: int = 5) -> dict:
         f"MRR@{k}": (sum(r["mrr"] for r in rows) / n) if n else 0.0,
         f"NDCG@{k}": (sum(r["ndcg"] for r in rows) / n) if n else 0.0,
     }
+
+
+def evaluate_by_split(dataset, prediction_map, k: int = 5, split_of=None) -> dict:
+    """按分组分别算指标，返回 {组名: 同 evaluate_predictions 的指标字典}。
+
+    【为什么需要分组】一张总平均表会把两类**性质完全不同**的问题混在一起：
+      · 字面式问题 —— 问法与语料原文关键词高度重叠，BM25 单靠关键词就能命中；
+      · 改写式问题 —— 问法换了说法（"口令"问成"密码"），只有语义检索才稳。
+    混在一起看时，前者会把平均分拉得很高，于是"融合/精排有没有用"这件事
+    被天花板效应压平，消融实验就看不出差别。
+    分开看之后，两组之间的**差距**才是"语义检索在起什么作用"的直接证据。
+
+    split_of：(sample) -> str。默认按 `paraphrased` 字段分成 改写式/字面式。
+    """
+    if split_of is None:
+        def split_of(sample):
+            return "改写式问题" if getattr(sample, "paraphrased", False) else "字面式问题"
+
+    groups: dict[str, list] = {}
+    for index, sample in enumerate(dataset):
+        groups.setdefault(split_of(sample), []).append((index, sample))
+
+    out: dict[str, dict] = {}
+    for name, members in groups.items():
+        sub_dataset = [s for _i, s in members]
+        # 【必须按子集重新编号】members 里存的是样本在**原评测集**里的下标，
+        # 而 evaluate_predictions 会拿 `enumerate(sub_dataset)` 的位置去算 sample_key。
+        # 如果这里沿用原下标建 sub_map，只有"下标恰好从 0 开始且连续"的那一组能对上，
+        # 其余分组会全部查不到预测 → 指标恒为 0.0，**而且不报错**，
+        # 表格里会安静地出现一个 0，看起来像"这组问题全错"。
+        # 实测踩到过：47 条字面式（下标 0~46）显示 Recall 1.0，
+        # 16 条改写式（下标 47~62）显示 0.0——不是模型差，是指标算错了。
+        sub_map = {}
+        for position, (original_index, sample) in enumerate(members):
+            sub_map[sample_key(sample, position)] = prediction_map.get(
+                sample_key(sample, original_index), []
+            )
+        out[name] = evaluate_predictions(sub_dataset, sub_map, k=k)
+    return out

@@ -49,6 +49,11 @@ class EvaluationSample(BaseModel):
     query_type: str = "SEMANTIC"            # EXACT/SEMANTIC/MIXED/NUMERIC（辅助分析用）
     id: str = ""                            # 可选稳定标识；重复问题时必须给
     source_document: str = ""               # 答案来自哪份文档（人工排查用）
+    # 是否为"改写式问题"（问法与语料原文用词不同，但答案仍在语料里）。
+    # 这个标记很有用：字面式问题 BM25 就能命中，改写式才真正考验语义检索——
+    # 两者必须分开看指标，否则一张平均表会把"关键词命中"与"语义命中"混为一谈，
+    # 而消融实验要区分的恰恰是这两件事。
+    paraphrased: bool = False
 
 
 def load_dataset(path: str | Path) -> list[EvaluationSample]:

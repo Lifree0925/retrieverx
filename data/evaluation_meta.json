@@ -1,10 +1,10 @@
 {
   "dataset": "evaluation.jsonl",
-  "samples": 47,
+  "samples": 63,
   "chunk_universe": 39,
   "query_types": {
     "NUMERIC": 26,
-    "SEMANTIC": 9,
+    "SEMANTIC": 25,
     "EXACT": 12
   },
   "documents": {

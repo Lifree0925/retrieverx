@@ -216,6 +216,74 @@ QUESTIONS: list[dict] = [
     dict(doc=DEMO_KEY, query_type="SEMANTIC",
          question="哪些情形不属于免费保修范围",
          phrases=["不属于免费保修范围"]),
+
+    # ==================================================================
+    # 改写式问题（paraphrased）—— 专门用来让消融实验**有区分度**
+    # ------------------------------------------------------------------
+    # 【为什么要单独加这一组】第一版评测集里，问题与语料原文的关键词重叠度太高
+    # （几乎是照着原文措辞写的问题），实测结果是：
+    #     BM25 Only  Recall@5 = 0.9894
+    #     Vector Only Recall@5 = 1.0000
+    # 也就是说**单靠关键词匹配就接近满分**，四个档位的差距全被天花板压平了——
+    # 这张消融表证明不了"融合/精排有价值"，因为它压根没测出差别。
+    #
+    # 这一组刻意做到"问法与原文用词不同"（例如把"口令"问成"密码"、
+    # 把"回滚方案"问成"退路"），但**答案短语仍逐字出现在语料里**。
+    # 于是 BM25 会因为字面不匹配而掉分，向量检索应当更稳 —— 这才叫在测"语义检索"。
+    # ==================================================================
+    dict(doc="员工手册", query_type="SEMANTIC",
+         question="没休完的假期能不能留到明年用",
+         phrases=["最多结转五天至次年"], paraphrased=True),
+    dict(doc="员工手册", query_type="SEMANTIC",
+         question="加班换来的补休一直没用会怎么样",
+         phrases=["逾期作废"], paraphrased=True),
+    dict(doc="员工手册", query_type="SEMANTIC",
+         question="正式员工辞职要提前多久打招呼",
+         phrases=["提前三十日以书面形式通知"], paraphrased=True),
+
+    dict(doc="IT服务", query_type="SEMANTIC",
+         question="改动生产环境前如果没有准备退路会怎样",
+         phrases=["一律不予审批"], paraphrased=True),
+    dict(doc="IT服务", query_type="SEMANTIC",
+         question="多久必须真跑一次数据找回的流程",
+         phrases=["季度须组织一次恢复演练"], paraphrased=True),
+    dict(doc="IT服务", query_type="SEMANTIC",
+         question="备份的数据会存多长时间",
+         phrases=["保留三十天"], paraphrased=True),
+
+    dict(doc="信息安全", query_type="SEMANTIC",
+         question="系统密码多久必须换一次",
+         phrases=["有效期九十天"], paraphrased=True),
+    dict(doc="信息安全", query_type="SEMANTIC",
+         question="发现账号被盗用的迹象后要多久上报",
+         phrases=["两小时内"], paraphrased=True),
+    dict(doc="信息安全", query_type="SEMANTIC",
+         question="哪些系统的登录需要二次验证",
+         phrases=["强制启用多因素认证"], paraphrased=True),
+
+    dict(doc="财务报销", query_type="SEMANTIC",
+         question="出差回来最晚什么时候要把单据交上去",
+         phrases=["六十个自然日内"], paraphrased=True),
+    dict(doc="财务报销", query_type="SEMANTIC",
+         question="借了公司的钱最迟什么时候要结清账",
+         phrases=["十五个工作日内完成核销"], paraphrased=True),
+    dict(doc="财务报销", query_type="SEMANTIC",
+         question="给客户送礼的单件金额有没有上限",
+         phrases=["不超过五百元"], paraphrased=True),
+
+    dict(doc="采购制度", query_type="SEMANTIC",
+         question="临时加急的采购一年里能走几回",
+         phrases=["不得超过三次"], paraphrased=True),
+    dict(doc="采购制度", query_type="SEMANTIC",
+         question="买设备要押多少钱作为质量保证",
+         phrases=["百分之五作为质保金"], paraphrased=True),
+
+    dict(doc="QX8800", query_type="SEMANTIC",
+         question="两地机房做实时同步对网络有什么硬要求",
+         phrases=["往返延迟必须低于"], paraphrased=True),
+    dict(doc="QX8800", query_type="SEMANTIC",
+         question="一个控制器坏了业务会中断多久",
+         phrases=["切换时间实测小于三秒"], paraphrased=True),
 ]
 
 
@@ -331,6 +399,10 @@ def main() -> None:
             "relevant_chunk_ids": hits,
             "query_type": spec["query_type"],
             "source_document": docs[key].name,
+            # 标记"改写式问题"：它和"字面式问题"要分开看指标，
+            # 否则一张平均表会把"关键词能命中"和"语义能命中"混在一起，
+            # 而这两件事恰恰是消融实验要区分的对象。
+            "paraphrased": bool(spec.get("paraphrased")),
         })
         print(f"  [OK]   {spec['question']}  ->  {len(hits)} 个相关 chunk")
 
