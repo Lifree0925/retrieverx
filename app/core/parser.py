@@ -58,6 +58,7 @@ from uuid import NAMESPACE_URL, uuid5
 import fitz
 
 from app.models.document import DocumentChunk
+from app.utils.ids import ChunkIdFactory
 from app.utils.text import join_pdf_lines
 
 
@@ -116,6 +117,13 @@ class PDFParser:
             source_name = Path(file_path).name
         blocks: list[DocumentChunk] = []
 
+        # chunk_id 由「自身内容」派生，而不是「页码 + 页内序号」。
+        # 详见 app/utils/ids.py 的模块注释：绑在顺序上的 ID 会因为解析器一改
+        # 就集体位移，文件没动却产生"新 ID + 旧残留"。
+        # 这个工厂要**跨页共用**（在 parse_pdf 里建、传给每一页），
+        # 否则"同一内容第几次出现"的计数会在每页重置、出现重复 ID。
+        id_factory = ChunkIdFactory(document_id)
+
         with fitz.open(file_path) as pdf:
             # 先验 1：书签（目录）表，作为标题路径的基础
             outline_map = self._build_outline_map(pdf.get_toc(simple=True))
@@ -132,6 +140,7 @@ class PDFParser:
                         source_name=source_name,
                         size_to_level=size_to_level,
                         base_path=outline_map.get(page_number, []),
+                        id_factory=id_factory,
                     )
                 )
 
@@ -197,6 +206,7 @@ class PDFParser:
         source_name: str,
         size_to_level: dict[float, int],
         base_path: list[str],
+        id_factory: ChunkIdFactory,
     ) -> list[DocumentChunk]:
         """解析一页，按纵向顺序处理文本块与表格。
 
@@ -237,15 +247,10 @@ class PDFParser:
             last_index = {title: i for i, title in enumerate(merged)}
             return [title for i, title in enumerate(merged) if last_index[title] == i]
 
-        # chunk_id 用「document_id + 页号 + 页内序号」派生，保证同一份文件重复解析
-        # 得到完全相同的 ID（配合 document_id 的文件指纹，实现重复上传幂等覆盖）。
-        ordinal = 0
-
-        def next_chunk_id():
-            nonlocal ordinal
-            ordinal += 1
-            return uuid5(document_id, f"{page_number}:{ordinal}")
-
+        # chunk_id 由**块自身内容**派生（id_factory 由 parse_pdf 建好、跨页共用）。
+        # 为什么不再用「页码 + 页内序号」：序号只对"输出的块"递增，
+        # 解析器一改（页眉过滤、表格门槛）后面的 ID 就集体位移，
+        # 文件没变也会产生"新 ID + 旧残留"。详见 app/utils/ids.py。
         for kind, _y, payload in items:
             if kind == "text":
                 text = self._block_text(payload).strip()
@@ -264,7 +269,7 @@ class PDFParser:
 
                 output.append(
                     DocumentChunk(
-                        chunk_id=next_chunk_id(),
+                        chunk_id=id_factory.next(text),
                         document_id=document_id,
                         source_name=source_name,
                         content=text,
@@ -277,7 +282,7 @@ class PDFParser:
             else:
                 output.append(
                     DocumentChunk(
-                        chunk_id=next_chunk_id(),
+                        chunk_id=id_factory.next(payload["markdown"]),
                         document_id=document_id,
                         source_name=source_name,
                         content=payload["markdown"],

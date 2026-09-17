@@ -11,8 +11,19 @@ chunker.py —— 结构感知切块（Structure-aware Chunking）
       表格整块保留（拆开会失去行列对应关系）；
       同一标题下的若干段落累积到接近目标大小再成块；
       每个 Chunk 继承标题路径，保证"来源可追溯"。
+
+【chunk_id 为什么在这里重新分配】
+  解析器产出的块 id 是"这个块的内容"的函数，但切块器会把**若干块合并成一条 Chunk**，
+  合并后的内容与任何单个块都不同。如果沿用第一个块的 id（早期实现就是这样），
+  就会出现一个说不清的状态：**id 描述的内容和这条 Chunk 的实际内容对不上**。
+  所以这里统一按"合并后的最终内容"重新派生 id，保证一条铁律：
+
+      任何一条写进索引的 Chunk，它的 chunk_id 都是它自己内容的函数。
+
+  这样"同内容 → 同 id → upsert 就地覆盖"，解析器改了也不会留下旧残留。
 """
 from app.models.document import DocumentChunk
+from app.utils.ids import ChunkIdFactory
 from app.utils.text import join_pdf_lines
 
 
@@ -49,13 +60,21 @@ class StructureAwareChunker:
         size = 0
         current_section: tuple[str, ...] | None = None
 
+        # 整份文档共用一个 ID 工厂：合并后的内容可能完全相同（例如两节里各有一段
+        # 同样的说明文字），靠"第几次出现"区分，否则后一条会覆盖前一条、静默丢块。
+        id_factory = ChunkIdFactory(blocks[0].document_id) if blocks else None
+
         for block in blocks:
             if block.content_type == "table":
                 # 遇到表格：先把已累积的文本封口，再让表格独占一个 Chunk
                 if buffer:
-                    output.extend(self._flush(buffer))
+                    output.extend(self._flush(buffer, id_factory))
                     buffer, size = [], 0
-                output.append(block)  # 表格块原样保留（它已经是一个完整语义单元）
+                # 表格块内容原样保留（它已经是一个完整语义单元），
+                # 但仍按同一个工厂重新分配 id —— 让"id = 内容函数"这条铁律对所有块一致成立。
+                output.append(
+                    block.model_copy(update={"chunk_id": id_factory.next(block.content)})
+                )
                 current_section = tuple(block.heading_path)
                 continue
 
@@ -66,13 +85,13 @@ class StructureAwareChunker:
                 and section != current_section
                 and size >= self.section_min_chars
             ):
-                output.extend(self._flush(buffer))
+                output.extend(self._flush(buffer, id_factory))
                 buffer, size = [], 0
             current_section = section
 
             # 文本块：若加入会超出 max_chars，先封口旧内容
             if buffer and size + len(block.content) > self.max_chars:
-                output.extend(self._flush(buffer))
+                output.extend(self._flush(buffer, id_factory))
                 buffer, size = [], 0
 
             buffer.append(block)
@@ -80,21 +99,23 @@ class StructureAwareChunker:
 
             # 达到 min_chars 即封口：避免 Chunk 太大
             if size >= self.min_chars:
-                output.extend(self._flush(buffer))
+                output.extend(self._flush(buffer, id_factory))
                 buffer, size = [], 0
 
         if buffer:  # 收尾：清空剩余
-            output.extend(self._flush(buffer))
+            output.extend(self._flush(buffer, id_factory))
 
         return output
 
     @staticmethod
-    def _flush(blocks: list[DocumentChunk]) -> list[DocumentChunk]:
+    def _flush(blocks: list[DocumentChunk], id_factory: ChunkIdFactory) -> list[DocumentChunk]:
         """把 buffer 里若干相邻块合并成一个 Chunk。
 
         合并规则：
           - content 用 join_pdf_lines 规整：按句末标点分段、中文直接相接、
             英文之间补空格（详见 app/utils/text.py）；
+          - **chunk_id 按合并后的 content 重新派生**（不能用第一个块的 id：
+            合并后的内容才是这条 Chunk 真正的内容，id 必须与之一致）；
           - 元数据以第一个块的为准（第一个块通常带标题上下文）；
           - source_pages 记录该 Chunk 横跨了哪些页码（可能有跨页的段落）。
         """
@@ -109,6 +130,7 @@ class StructureAwareChunker:
         return [
             first.model_copy(
                 update={
+                    "chunk_id": id_factory.next(content),
                     "content": content,
                     "metadata": {
                         **first.metadata,
@@ -154,6 +176,10 @@ class FixedChunker:
         doc_id = blocks[0].document_id
         source_name = blocks[0].source_name
         flat = "\n".join(b.content for b in blocks)
+        # 【必须自己也派生 chunk_id】早期实现没传 chunk_id，直接落到
+        # DocumentChunk 的 default_factory=uuid4 —— 于是这条消融基线每次跑出来的
+        # ID 都不一样，"重复索引幂等"在它身上根本不成立，评测集也没法稳定引用它。
+        id_factory = ChunkIdFactory(doc_id)
 
         chunks: list[DocumentChunk] = []
         step = self.chunk_size - self.overlap
@@ -164,6 +190,7 @@ class FixedChunker:
             if content.strip():
                 chunks.append(
                     DocumentChunk(
+                        chunk_id=id_factory.next(content),
                         document_id=doc_id,
                         source_name=source_name,
                         content=content,

@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     # 填 https://hf-mirror.com 走国内镜像；留空则用官方源。
     hf_endpoint: str | None = None
 
+    # ---------- 文档上传 ----------
+    # 单个上传文件的大小上限（MB）。接口无鉴权 + 无上限 = 一个请求就能把内存/磁盘打满。
+    # 注意这个限制是**边写边数字节**生效的，不依赖 Content-Length：
+    # 请求头可以被伪造、也可以在分块传输里缺失，只有真正数落盘的字节数才靠得住。
+    max_upload_mb: int = Field(default=50, ge=1, le=2048)
+
     # ---------- 检索链路参数 ----------
     default_top_k: int = Field(default=5, ge=1, le=100)     # 对外默认返回条数
                                                             # （app/models/retrieval.py 的 SearchRequest 读它）

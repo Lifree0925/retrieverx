@@ -15,8 +15,13 @@ class DocumentChunk(BaseModel):
     """一条切好的文本块。
 
     字段说明：
-      chunk_id       Chunk 唯一标识，由「文件内容指纹 + 页码 + 页内序号」确定性派生，
-                     保证同一份文件重复解析得到相同的 ID（重复上传即幂等覆盖）。
+      chunk_id       Chunk 唯一标识，**由"所属文档 + 这段内容本身"确定性派生**
+                     （`uuid5(document_id, f"chunk:{document_id}:{内容指纹}:{第几次出现}")`，
+                     实现见 app/utils/ids.py）。
+                     关键性质：ID 不依赖页码、不依赖解析顺序、不依赖解析器版本 ——
+                     所以同一段内容无论排在哪里、重复索引多少次，都是同一个 ID
+                     （upsert 就地覆盖，不会留下"新 ID + 旧残留"）；
+                     内容真的改了才会换 ID。
       document_id    所属文档标识（由文件 sha256 派生，一份 PDF 的所有 Chunk 共享）。
       source_name    来源文件名（如 "产品手册-PX4200.pdf"），用于前端展示文档库。
       content        文本内容（正文段落，或 Markdown 格式的表格）。
